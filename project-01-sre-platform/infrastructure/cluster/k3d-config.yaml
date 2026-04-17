@@ -1,0 +1,42 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+
+metadata:
+  name: sre-platform
+
+# Topology: one server, three agents. Matches the "multi-node cluster
+# lifecycle" requirement and provides real scheduling surface for demos.
+servers: 1
+agents: 3
+
+# Port mappings exposed by the k3d load balancer.
+# 8080  → cluster ingress (Traefik on :80) — Platform API reachable here
+# 3301  → SigNoz UI
+# 8233  → ArgoCD server (https) — NodePort 30080 inside cluster
+ports:
+  - port: "8080:80"
+    nodeFilters:
+      - loadbalancer
+  - port: "3301:3301"
+    nodeFilters:
+      - loadbalancer
+  - port: "8233:443"
+    nodeFilters:
+      - loadbalancer
+
+# Options: fast start, no Traefik disable (we use it for ingress).
+options:
+  k3d:
+    wait: true
+    timeout: 180s
+    disableLoadbalancer: false
+  k3s:
+    extraArgs:
+      # Disable metrics-server — we use SigNoz + OpenTelemetry for metrics,
+      # not the in-tree metrics pipeline. Saves ~100MB RAM.
+      - arg: "--disable=metrics-server"
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
