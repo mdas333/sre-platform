@@ -1,5 +1,7 @@
 # Project 01 — sre-platform
 
+[![ci](https://github.com/mdas333/sre-platform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mdas333/sre-platform/actions/workflows/ci.yml)
+
 An internal developer platform on Kubernetes, with SRE-grade reliability engineering built in — not bolted on.
 
 Operating Kubernetes reliably is more than deployment scripts: it requires observable, self-healing infrastructure with meaningful health signals. This project implements a working platform that covers the full loop — declarative cluster lifecycle, a developer-facing Platform API, error-budget-aware health, HMAC-signed audit receipts, OpenTelemetry-native observability, event-driven autoscaling on a separate demo workload (the Platform API itself runs always-on), GitOps deployment, and images signed in CI with keyless cosign via GitHub OIDC.
@@ -137,9 +139,15 @@ kubectl drain k3d-extra-0 --ignore-daemonsets --delete-emptydir-data
 k3d node delete k3d-extra-0
 ```
 
-**Workload-level** (KEDA HTTP add-on). The Platform API itself is the control plane and runs always-on (`minReplicas: 1`) — scaling the API to zero would make `/workloads`, `/audit`, and `/health` unreachable on cold start. The scale-to-zero demo therefore targets a *separate* sample workload (`k8s/demo-app/`) with its own `ScaledObject`: `minReplicaCount: 0`, `maxReplicaCount: 5`, scaling on request rate.
+![cluster-level scale](./docs/demos/cluster-scale.gif)
 
-Demonstration: `scripts/load.sh` generates load with `hey` against the demo workload; `kubectl get pods -w -n sre-platform` shows scale 0→N and back to 0. Recording lives at `docs/scaling-demo.md`. See [ADR 0005](../shared/adr/0005-keda-over-hpa.md).
+**Workload-level** (KEDA on `demo-app`). The Platform API itself is the control plane and runs always-on (`minReplicas: 2`) — scaling the API to zero would make `/workloads`, `/audit`, and `/health` unreachable on cold start. The scale-to-zero narrative therefore targets a *separate* `demo-app` workload (`k8s/demo-app/keda-scaledobject.yaml`): `minReplicaCount: 0`, `maxReplicaCount: 3`, triggered by a cron window.
+
+The demo recording below captures the full cycle — patch the ScaledObject's cron window to the current minute, KEDA polls every 15 s and scales `demo-app` from 0 to 2 replicas Ready in ~18 s, then the window is restored and the cooldown timer returns the workload to zero.
+
+![keda scale-to-zero](./docs/demos/keda-scale.gif)
+
+The cron trigger is deliberate for a reproducible demo; production workloads would use HTTP-rate, Prometheus, Kafka, or SQS triggers depending on their signal source. See [ADR 0005](../shared/adr/0005-keda-over-hpa.md).
 
 ## Observability (SigNoz, OpenTelemetry-native)
 
@@ -178,26 +186,39 @@ uv run pytest -v
 uv run ruff check src tests
 ```
 
-Suites:
+Suites in `platform-api/tests/`:
 
-- `test_slo_math.py` — budget math, rolling windows, edge cases (zero events, zero budget, target = 100).
-- `test_receipts.py` — HMAC signing and verifier round-trip, key rotation, canonical JSON determinism.
-- `test_health_score.py` — the aggregate 0–100 computation.
-- `test_platform_api_e2e.py` — the full route surface against a fake Kubernetes client.
+- `test_slo_math.py` — budget math, rolling windows, edge cases (zero events, zero budget, target = 100), configurable burn thresholds.
+- `test_slo_store.py` — registry invariants: record() rejects negative deltas and `failed > total`.
+- `test_receipts.py` — HMAC signing and verifier round-trip, key rotation, canonical JSON determinism, constant-time comparison, tampering detection.
 
-## CI
+## CI and signed images
 
-On push to `main`, GitHub Actions runs: ruff lint → pytest → Docker image build → cosign sign → push to GHCR. ArgoCD in the cluster detects the new tag and syncs.
+On every push to `main`, the GitHub Actions workflow (`.github/workflows/ci.yml`) runs three jobs:
 
-Workflow file: `.github/workflows/ci.yml`.
+1. **Platform API — ruff + pytest.** uv sync, ruff check, pytest.
+2. **Kubernetes manifests — kubeconform.** Strict schema validation of `k8s/**` using the Datree CRD catalog so KEDA ScaledObject and similar CRDs are recognised.
+3. **Build, sign, push to GHCR.** Docker buildx with GHA cache, metadata-driven tags (`main`, `main-<sha>`, `latest`), push to `ghcr.io/mdas333/sre-platform/platform-api`, then **keyless Sigstore cosign** — the workflow's OIDC identity is the only signer; no private key is generated or stored. Verification chains the signature back to `refs/heads/main` of this repo.
+
+Verify any published image locally:
+
+```bash
+scripts/verify-image.sh ghcr.io/mdas333/sre-platform/platform-api:main
+# Runs:
+# cosign verify \
+#   --certificate-identity-regexp '.*mdas333/sre-platform.*' \
+#   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+#   ghcr.io/mdas333/sre-platform/platform-api:main
+```
+
+ArgoCD in the cluster reconciles the `k8s/` tree on `main`, so merging a commit that bumps an image tag (or any manifest) triggers a rollout.
 
 ## Status
 
-- [x] Workspace skeleton and governance.
-- [x] Architecture decision records and capabilities index.
-- [x] OpenTofu cluster definition; scale-up / scale-down scripts verified live (4↔5 nodes).
+- [x] Workspace skeleton, 11 ADRs, capabilities index.
+- [x] OpenTofu cluster definition (`kreuzwerker/k3d`-style `null_resource` with idempotent create / destroy); scale-up / scale-down scripts verified live (4 ↔ 5 nodes).
 - [x] Vault, ArgoCD, SigNoz, KEDA, OTel Collector install scripts — chained in `cluster-up.sh`; Vault Kubernetes auth bootstrapped idempotently.
-- [x] Platform API: 17 routes, 25 unit tests passing, ruff clean, end-to-end smoke against the live cluster (real node list, signed receipt, Prometheus metrics).
-- [ ] Image signing and CI pipeline.
-- [ ] Scaling demo recordings.
-- [ ] Architecture diagram.
+- [x] Platform API: 17 routes, 31 unit tests passing, ruff clean, end-to-end smoke against the live cluster (real node list, signed receipt with Vault-sourced `kid`, Prometheus metrics).
+- [x] Container image (Dockerfile multi-stage, non-root, read-only rootfs); GHCR push and keyless cosign signing in CI; image verified offline with `scripts/verify-image.sh`.
+- [x] ArgoCD Application — `sre-platform` — syncs 12 resources from `main` (Synced/Healthy).
+- [x] Scaling demo recordings — cluster-level and KEDA scale-from-zero, under `docs/demos/`.

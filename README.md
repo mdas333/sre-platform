@@ -1,5 +1,7 @@
 # sre-platform
 
+[![ci](https://github.com/mdas333/sre-platform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mdas333/sre-platform/actions/workflows/ci.yml)
+
 An internal developer platform on Kubernetes, with SRE-grade reliability engineering built in — not bolted on.
 
 ## What this is
