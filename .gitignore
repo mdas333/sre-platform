@@ -1,0 +1,91 @@
+# Workspace-local governance and plans — never ship
+CLAUDE.md
+.claude/
+.plans/
+*.plan.md
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.history/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# uv
+uv-cache/
+
+# Node (just in case)
+node_modules/
+
+# Terraform / OpenTofu
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl.bak
+crash.log
+crash.*.log
+
+# Kubernetes local state
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+!secrets/.gitkeep
+
+# 2FA / recovery codes / tokens — never commit
+*recovery-codes*
+*-recovery-codes.txt
+*-backup-codes.txt
+*.recovery
+github-recovery-codes*
+*-token.txt
+*-credentials.txt
+*.token
+*.apikey
+*_secret
+*_secret.*
+credentials.json
+token.json
+
+# Local demo artifacts
+demo/output/
+*.cast
+
+# Logs
+logs/
+*.log
