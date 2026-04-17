@@ -1,0 +1,13 @@
+# SigNoz — OpenTelemetry-native observability backend.
+#
+# The portfolio uses SigNoz for metrics, logs, and traces in a single
+# ClickHouse store. See shared/adr/0004-signoz-over-prometheus-grafana.md
+# for the decision.
+
+clickhouse:
+  persistence:
+    size: 4Gi
+
+frontend:
+  service:
+    type: ClusterIP

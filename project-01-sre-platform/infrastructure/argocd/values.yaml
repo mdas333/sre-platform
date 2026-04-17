@@ -1,0 +1,22 @@
+# ArgoCD — GitOps controller.
+#
+# Lean profile: Dex, notifications, and applicationset controllers are off.
+# The portfolio does not use SSO, Slack alerting, or app generators in
+# Project 01 — those live in Project 03 when the "paved road" needs them.
+
+configs:
+  params:
+    server.insecure: "true"
+
+server:
+  service:
+    type: ClusterIP
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+applicationSet:
+  enabled: false

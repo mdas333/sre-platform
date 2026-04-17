@@ -1,0 +1,46 @@
+# OpenTelemetry Collector — DaemonSet mode.
+#
+# Runs on every node to collect per-node host and kubelet metrics plus
+# container logs. Forwards all signals to the SigNoz-built-in collector
+# via OTLP/gRPC over the cluster-internal service DNS.
+
+mode: daemonset
+
+# The K8s distribution ships the K8s-specific receivers (hostmetrics,
+# kubeletstats, k8sattributes, k8scluster, k8sevents) without the full
+# 'contrib' image weight.
+image:
+  repository: otel/opentelemetry-collector-k8s
+  tag: 0.144.0
+
+presets:
+  hostMetrics:
+    enabled: true
+  kubeletMetrics:
+    enabled: true
+  kubernetesAttributes:
+    enabled: true
+  logsCollection:
+    enabled: true
+    includeCollectorLogs: false
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+config:
+  exporters:
+    otlp/signoz:
+      endpoint: signoz-otel-collector.signoz.svc.cluster.local:4317
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      metrics:
+        exporters: [otlp/signoz]
+      logs:
+        exporters: [otlp/signoz]

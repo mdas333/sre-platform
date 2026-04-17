@@ -1,0 +1,22 @@
+# Vault — dev mode.
+#
+# In production this would be a HA StatefulSet with raft storage and
+# auto-unseal via a cloud KMS. For a portfolio demo, dev mode is
+# deliberately chosen — see shared/adr/0006-vault-k8s-auth.md.
+
+server:
+  dev:
+    enabled: true
+    devRootToken: root
+  resources:
+    limits:
+      memory: 256Mi
+      cpu: 200m
+    requests:
+      memory: 64Mi
+      cpu: 50m
+
+# Disable the sidecar injector — the Platform API reads secrets directly via
+# the Vault SDK using its ServiceAccount token. One fewer moving part.
+injector:
+  enabled: false

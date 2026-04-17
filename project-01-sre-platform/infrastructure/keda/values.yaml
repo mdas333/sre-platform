@@ -1,0 +1,22 @@
+# KEDA — Kubernetes Event-Driven Autoscaling.
+#
+# Defaults are sensible for a portfolio deploy. Resource ceilings are tight
+# because a 4-node k3d cluster has limited headroom.
+#
+# See shared/adr/0005-keda-over-hpa.md for the decision rationale.
+
+resources:
+  operator:
+    limits:
+      memory: 256Mi
+      cpu: 200m
+    requests:
+      memory: 64Mi
+      cpu: 50m
+  metricServer:
+    limits:
+      memory: 256Mi
+      cpu: 200m
+    requests:
+      memory: 64Mi
+      cpu: 50m
