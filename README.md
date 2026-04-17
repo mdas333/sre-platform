@@ -9,12 +9,14 @@ A working portfolio: a platform engineering + site reliability engineering proje
 Project 01 demonstrates:
 
 - Declarative Kubernetes cluster lifecycle with OpenTofu.
-- Two-layer scaling — cluster nodes and workload pods (with scale-to-zero).
+- Two layers of scaling — cluster nodes, plus workload pods with scale-to-zero on a separate demo workload (the Platform API itself stays always-on).
 - A developer-facing Platform API with error-budget-aware health and SLO math.
-- Cryptographically signed audit receipts for every platform operation.
+- HMAC-signed audit receipts for every platform operation, verifiable offline.
 - OpenTelemetry-native observability (SigNoz) across metrics, logs, and traces.
-- GitOps deployment via ArgoCD; signed container images via Sigstore cosign.
-- A pluggable LLM adapter that summarises workload state in plain English.
+- GitOps deployment via ArgoCD; container images signed in CI with Sigstore cosign (keyless, via GitHub OIDC).
+- An optional, disabled-by-default LLM adapter that summarises workload state in plain English.
+
+Project 01 optimises for **breadth** — every component a platform team typically integrates, brought up at laptop scale. Project 03 revisits the same pieces in a paved-road, multi-environment form.
 
 ## Project arc
 
@@ -27,12 +29,14 @@ Project 01 demonstrates:
 
 ## Navigation
 
-- [`shared/`](./shared/) — cross-project knowledge: architecture decision records, glossary, talking points, reusable OpenTofu modules, bootstrap scripts.
+- [`shared/`](./shared/) — cross-project knowledge: architecture decision records, glossary, a capabilities index, reusable OpenTofu modules, bootstrap scripts.
 - [`project-XX-*/`](.) — each project is self-contained with its own README, infrastructure, application code, tests, and documentation. Project 01 is the primary artifact.
 
 ## Quick start (project 01)
 
 Prerequisites: Docker Desktop running, Homebrew available.
+
+Tested on Docker Desktop with 8 GB memory and 14 CPUs; the full stack's measured peak memory is approximately 4.5 GB.
 
 ```bash
 ./shared/scripts/preflight.sh           # verify local tooling

@@ -9,11 +9,9 @@ The Platform API exposes `GET /workloads/{id}/explain`, which summarises recent 
 
 Three constraints shape the design:
 
-1. The default code path must work without any paid API key — a fresh clone on a recruiter's laptop must succeed end-to-end.
-2. The feature should use the best-available model when one is configured — either the Google AI Studio free tier or a managed key the user provides.
-3. The abstraction should be the same pattern production SRE tooling uses — multi-provider routing, not a hard dependency on one vendor.
-
-Default selection: Gemini 2.5 Pro via the Google AI Studio free tier (no credit card required). Fallback: Ollama running locally with a small model (`qwen2.5:3b` or similar). The Claude backend is stubbed for Project 02, where agentic behaviour justifies a more capable managed model.
+1. The default code path must not require any external account beyond git, Docker, and GitHub. A fresh clone on a stranger's laptop must succeed end-to-end without LLM credentials.
+2. When a user opts in, the feature should support at least one free-tier managed model (Gemini via Google AI Studio) *and* one fully local option (Ollama), so the user can choose between zero-setup and zero-network-dependency.
+3. The abstraction should match the multi-provider routing pattern used in production SRE tooling — not a hard dependency on one vendor.
 
 ## Decision
 
@@ -22,12 +20,14 @@ Define an `LLMBackend` `Protocol` with a single method, `generate(prompt: str) -
 ```
 src/llm/
 ├── backend.py            # Protocol + factory by name
-├── gemini_backend.py     # default; GOOGLE_API_KEY
-├── ollama_backend.py     # fallback; http://host.docker.internal:11434
+├── gemini_backend.py     # opt-in; GOOGLE_API_KEY
+├── ollama_backend.py     # opt-in; http://host.docker.internal:11434
 └── claude_backend.py     # stub; ANTHROPIC_API_KEY; wired in Project 02
 ```
 
-Selection is controlled by `LLM_BACKEND` (default `gemini`), and the feature is gated off via `ENABLE_LLM_EXPLAIN=false` at deploy time. When the feature is off, `/explain` returns structured status (events + SLO state + pod summary) with `narrative: null` and HTTP 200.
+The `/explain` feature is **off by default**: `ENABLE_LLM_EXPLAIN=false`. When disabled, `/explain` returns the structured status (events + SLO state + pod summary) with `narrative: null` and HTTP 200. When enabled, the active backend is selected via `LLM_BACKEND=gemini` or `LLM_BACKEND=ollama`; the factory returns `None` if the chosen backend cannot be constructed, in which case `/explain` continues to serve the structured response with a `reason` field.
+
+Neither backend is "the default." The default posture is *the feature is off*; the user opts in explicitly by setting both `ENABLE_LLM_EXPLAIN=true` and a valid `LLM_BACKEND` (plus the relevant credential for that backend).
 
 Timeout per LLM call: 5 seconds. On any error, log the failure and return the structured-only response.
 

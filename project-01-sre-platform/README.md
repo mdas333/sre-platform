@@ -2,7 +2,9 @@
 
 An internal developer platform on Kubernetes, with SRE-grade reliability engineering built in — not bolted on.
 
-Operating Kubernetes reliably is more than deployment scripts: it requires observable, self-healing infrastructure with meaningful health signals. This project implements a working platform that covers the full loop — declarative cluster lifecycle, a developer-facing Platform API, error-budget-aware health, cryptographically signed audit receipts, OpenTelemetry-native observability, event-driven autoscaling with scale-to-zero, GitOps deployment, and signed container images.
+Operating Kubernetes reliably is more than deployment scripts: it requires observable, self-healing infrastructure with meaningful health signals. This project implements a working platform that covers the full loop — declarative cluster lifecycle, a developer-facing Platform API, error-budget-aware health, HMAC-signed audit receipts, OpenTelemetry-native observability, event-driven autoscaling on a separate demo workload (the Platform API itself runs always-on), GitOps deployment, and images signed in CI with keyless cosign via GitHub OIDC.
+
+The Platform API exposes only a demo-grade surface in P1: no auth middleware, no quota enforcement, no admission-policy hooks. Those guardrails are on the Project 03 roadmap (`paved-road`), which revisits every component in a multi-environment form.
 
 ## What it does
 
@@ -12,7 +14,7 @@ The project stands up a four-node k3d cluster and a Platform API that lets you:
 - **Query workload health** as an error-budget state (`GET /workloads/{id}/health`).
 - **Scale a workload** with an auditable signed receipt (`POST /workloads/{id}/scale`).
 - **Read the SLO math** — error budget remaining, burn rate (`GET /workloads/{id}/slo`).
-- **Get a plain-English status** via an LLM adapter (`GET /workloads/{id}/explain`).
+- **Get a plain-English status** via an LLM adapter, disabled by default (`GET /workloads/{id}/explain`).
 - **See a 0–100 cluster health score** (`GET /cluster/health`).
 - **Audit every mutating operation** via a signed receipt stream (`GET /audit`).
 
@@ -93,9 +95,11 @@ Each workload registers an SLO at creation time — a target, a rolling window, 
 - `error_budget_remaining = total − consumed`
 - `burn_rate` — consumed rate relative to sustainable rate
 
-`/health` returns `healthy`, `burning`, or `breached` based on budget position — not just HTTP 200. The full math is at `/slo` and as the Prometheus metric `platform_slo_error_budget_remaining_seconds`.
+`/health` returns `healthy`, `burning`, or `breached` based on budget position — not just HTTP 200. The full math is at `/slo` and as the Prometheus gauges `platform_slo_error_budget_remaining` and `platform_slo_burn_rate`.
 
-See `docs/slo-model.md` for the formulas and worked examples, and [ADR 0010](../shared/adr/0010-slo-math-over-dashboards.md) for the decision rationale.
+**Telemetry source (P1 demo):** the Platform API self-instruments its own request counters (`platform_http_requests_total`, `platform_http_failures_total`) and exposes them on `/metrics`. The OpenTelemetry Collector scrapes the endpoint and forwards to SigNoz — this is standard Prometheus white-box instrumentation. `scripts/load.sh` injects real HTTP traffic with a configurable failure rate so the error budget visibly burns down. The in-memory SLO counters are bounded and reset on pod restart; a production deployment would ingest ingress / service-mesh metrics over rolling 7- or 30-day windows and persist them.
+
+See [ADR 0010](../shared/adr/0010-slo-math-over-dashboards.md) for the decision rationale.
 
 ## Signed receipts (the audit differentiator)
 
@@ -126,16 +130,16 @@ Two layers, both demonstrated.
 
 ```bash
 # Add an agent node
-k3d node create extra-agent --cluster sre-platform --role agent
+k3d node create extra --cluster sre-platform --role agent
 
 # Drain and remove
-kubectl drain k3d-sre-platform-agent-2 --ignore-daemonsets --delete-emptydir-data
-k3d node delete k3d-sre-platform-agent-2
+kubectl drain k3d-extra-0 --ignore-daemonsets --delete-emptydir-data
+k3d node delete k3d-extra-0
 ```
 
-**Workload-level** (KEDA HTTP add-on). A `ScaledObject` targets the Platform API Deployment with `minReplicas=0`, `maxReplicas=5`, `cooldownPeriod=120s`, scaling on request rate.
+**Workload-level** (KEDA HTTP add-on). The Platform API itself is the control plane and runs always-on (`minReplicas: 1`) — scaling the API to zero would make `/workloads`, `/audit`, and `/health` unreachable on cold start. The scale-to-zero demo therefore targets a *separate* sample workload (`k8s/demo-app/`) with its own `ScaledObject`: `minReplicaCount: 0`, `maxReplicaCount: 5`, scaling on request rate.
 
-Demonstration: `scripts/load.sh` generates load with `hey`; `kubectl get pods -w` shows scale 0→N and back to 0. Recording lives at `docs/scaling-demo.md`. See [ADR 0005](../shared/adr/0005-keda-over-hpa.md).
+Demonstration: `scripts/load.sh` generates load with `hey` against the demo workload; `kubectl get pods -w -n sre-platform` shows scale 0→N and back to 0. Recording lives at `docs/scaling-demo.md`. See [ADR 0005](../shared/adr/0005-keda-over-hpa.md).
 
 ## Observability (SigNoz, OpenTelemetry-native)
 
@@ -190,10 +194,10 @@ Workflow file: `.github/workflows/ci.yml`.
 ## Status
 
 - [x] Workspace skeleton and governance.
-- [x] Architecture decision records (11) and glossary.
-- [ ] OpenTofu cluster definition.
-- [ ] Vault, ArgoCD, SigNoz, KEDA, OTel Collector install scripts.
-- [ ] Platform API (FastAPI scaffold, SLO, receipts, LLM adapter).
+- [x] Architecture decision records and capabilities index.
+- [x] OpenTofu cluster definition; scale-up / scale-down scripts verified live (4↔5 nodes).
+- [x] Vault, ArgoCD, SigNoz, KEDA, OTel Collector install scripts — chained in `cluster-up.sh`; Vault Kubernetes auth bootstrapped idempotently.
+- [x] Platform API: 17 routes, 25 unit tests passing, ruff clean, end-to-end smoke against the live cluster (real node list, signed receipt, Prometheus metrics).
 - [ ] Image signing and CI pipeline.
 - [ ] Scaling demo recordings.
 - [ ] Architecture diagram.

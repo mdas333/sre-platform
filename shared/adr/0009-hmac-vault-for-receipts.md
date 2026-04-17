@@ -50,6 +50,14 @@ A standalone verifier at `scripts/verify-receipt` reads a JSON receipt on stdin 
 - HMAC is symmetric; anyone with the signing key can forge receipts. Access to the key is restricted to the Platform API's Vault role, and Vault's own audit log captures every read.
 - For a public audit story a asymmetric signature would be stronger. That is on the Project 04 roadmap when the signed artifact is exposed externally.
 
+## P1 limitations and production readiness
+
+Explicit as a known scope boundary, not discovered during review:
+
+- **In-memory receipt buffer.** The Platform API retains only the last 200 receipts. Restart loses the history. A production deployment would either ship each receipt as an OTel log into ClickHouse (via SigNoz's collector, already in the cluster) or write to an append-only NDJSON/SQLite store mounted from a PVC. The signer and verifier are independent of storage and would not change.
+- **Single bootstrap key, no rotation.** `vault/bootstrap.sh` seeds one key and leaves it in place (re-runs are idempotent, so re-running does not invalidate existing receipts). Production would rotate daily via a CronJob, with the verifier accepting both the current and previous `kid` during an overlap window. The verifier already takes a `KeyResolver` callable, so rotation is a deployment change, not a code change.
+- **Vault dev mode.** Storage is not durable. Production would use raft storage with auto-unseal via a cloud KMS.
+
 ## Related
 
 - ADR 0006 (Vault Kubernetes auth) — how the Platform API gets the signing key.

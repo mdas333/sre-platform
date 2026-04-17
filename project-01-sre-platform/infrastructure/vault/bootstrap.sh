@@ -53,15 +53,20 @@ vexec write auth/kubernetes/role/platform-api \
   policies=platform-api \
   ttl=1h
 
-echo "[5] Seed initial receipt-signing secret"
+echo "[5] Seed initial receipt-signing secret (idempotent)"
 # Vault dev mode pre-enables KV v2 at secret/, so no mount step needed.
-# Generate a fresh 256-bit key. The Platform API reads this at startup and
-# rotates via a daily CronJob in production. For the portfolio demo, a
-# single bootstrap write is sufficient.
-SIGNING_KEY="$(openssl rand -base64 32)"
-KID="key-$(date +%Y-%m-%d)"
-vexec kv put secret/platform-api/receipt-key kid="$KID" key="$SIGNING_KEY" >/dev/null
-echo "    wrote secret/platform-api/receipt-key with kid=$KID"
+# Only write a fresh key if one does not already exist. Re-running this
+# script must NOT rotate the key — doing so would invalidate every receipt
+# emitted by the currently-running Platform API.
+if vexec kv get -field=kid secret/platform-api/receipt-key >/dev/null 2>&1; then
+  EXISTING_KID="$(vexec kv get -field=kid secret/platform-api/receipt-key)"
+  echo "    receipt-signing key already present (kid=$EXISTING_KID); leaving intact"
+else
+  SIGNING_KEY="$(openssl rand -base64 32)"
+  KID="key-$(date +%Y-%m-%d)"
+  vexec kv put secret/platform-api/receipt-key kid="$KID" key="$SIGNING_KEY" >/dev/null
+  echo "    wrote secret/platform-api/receipt-key with kid=$KID"
+fi
 
 echo
 echo "Vault bootstrap complete."

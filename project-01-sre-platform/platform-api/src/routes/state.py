@@ -7,11 +7,14 @@ store and receipt emitter come to life on first use.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 
 from receipts.emitter import ReceiptEmitter
 from slo.store import SLOStore
+
+logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 _slo_store: SLOStore | None = None
@@ -57,6 +60,9 @@ def get_emitter() -> ReceiptEmitter:
                         import base64
                         return data["kid"], base64.b64decode(data["key"])
             except Exception:
-                pass  # Vault unavailable in dev; stay on dev_key_provider
+                logger.warning(
+                    "Vault receipt-key provider unavailable; using dev key fallback",
+                    exc_info=True,
+                )
             _emitter = ReceiptEmitter(key_provider=key_provider)
     return _emitter

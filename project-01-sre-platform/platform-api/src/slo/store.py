@@ -57,6 +57,14 @@ class SLOStore:
             return list(self._store.values())
 
     def record(self, workload_id: str, *, total: int, failed: int) -> WorkloadSLO | None:
+        if total < 0 or failed < 0:
+            raise ValueError(
+                f"SLO counter deltas must be non-negative; got total={total}, failed={failed}"
+            )
+        if failed > total:
+            raise ValueError(
+                f"failed events cannot exceed total; got total={total}, failed={failed}"
+            )
         with self._lock:
             entry = self._store.get(workload_id)
             if entry is None:

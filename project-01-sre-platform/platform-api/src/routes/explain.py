@@ -10,6 +10,7 @@ returns structured-only data with `narrative: null` at HTTP 200 (graceful).
 from __future__ import annotations
 
 import logging
+import threading
 
 from fastapi import APIRouter, HTTPException
 
@@ -24,14 +25,16 @@ router = APIRouter()
 
 _backend = None
 _backend_attempted = False
+_backend_lock = threading.Lock()
 
 
 def _backend_singleton():
     global _backend, _backend_attempted
-    if not _backend_attempted:
-        _backend = make_backend()
-        _backend_attempted = True
-    return _backend
+    with _backend_lock:
+        if not _backend_attempted:
+            _backend = make_backend()
+            _backend_attempted = True
+        return _backend
 
 
 def _build_prompt(workload_id: str, slo_view: dict) -> str:

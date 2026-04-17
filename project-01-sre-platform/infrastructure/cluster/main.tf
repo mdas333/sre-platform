@@ -5,6 +5,11 @@ locals {
 # Cluster lifecycle, driven by the k3d declarative config.
 # Triggers include the config file's hash so a config change causes a
 # `tofu apply` to tear down and recreate the cluster deterministically.
+#
+# All interpolated variables are passed via `environment` and then quoted
+# inside the shell script so the interpolation cannot inject arbitrary
+# shell. Belt and braces: default values are safe, but treat every variable
+# as untrusted input.
 resource "null_resource" "k3d_cluster" {
   triggers = {
     cluster_name = var.cluster_name
@@ -13,19 +18,28 @@ resource "null_resource" "k3d_cluster" {
 
   provisioner "local-exec" {
     when    = create
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      CLUSTER_NAME    = var.cluster_name
+      K3D_CONFIG_PATH = var.k3d_config_path
+    }
     command = <<-EOT
-      set -e
-      if k3d cluster list --output json | jq -er '.[] | select(.name == "${var.cluster_name}")' > /dev/null 2>&1; then
-        echo "cluster ${var.cluster_name} already exists; skipping create"
+      set -euo pipefail
+      if k3d cluster list --output json | jq -er --arg name "$CLUSTER_NAME" '.[] | select(.name == $name)' > /dev/null 2>&1; then
+        echo "cluster $CLUSTER_NAME already exists; skipping create"
       else
-        k3d cluster create --config ${var.k3d_config_path}
+        k3d cluster create --config "$K3D_CONFIG_PATH"
       fi
     EOT
   }
 
   provisioner "local-exec" {
-    when    = destroy
-    command = "k3d cluster delete ${self.triggers.cluster_name} || true"
+    when        = destroy
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      CLUSTER_NAME = self.triggers.cluster_name
+    }
+    command = "k3d cluster delete \"$CLUSTER_NAME\" || true"
   }
 }
 
@@ -36,16 +50,30 @@ resource "null_resource" "kubeconfig" {
 
   triggers = {
     cluster_id      = null_resource.k3d_cluster.id
+    cluster_name    = var.cluster_name
     kubeconfig_path = var.kubeconfig_output
   }
 
   provisioner "local-exec" {
-    command = "k3d kubeconfig get ${var.cluster_name} > ${var.kubeconfig_output}"
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      CLUSTER_NAME    = var.cluster_name
+      KUBECONFIG_PATH = var.kubeconfig_output
+    }
+    command = <<-EOT
+      set -euo pipefail
+      mkdir -p "$(dirname "$KUBECONFIG_PATH")"
+      k3d kubeconfig get "$CLUSTER_NAME" > "$KUBECONFIG_PATH"
+    EOT
   }
 
   provisioner "local-exec" {
-    when       = destroy
-    command    = "rm -f ${self.triggers.kubeconfig_path}"
+    when        = destroy
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      KUBECONFIG_PATH = self.triggers.kubeconfig_path
+    }
+    command    = "rm -f \"$KUBECONFIG_PATH\""
     on_failure = continue
   }
 }

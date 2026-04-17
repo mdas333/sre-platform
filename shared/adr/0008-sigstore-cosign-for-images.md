@@ -16,21 +16,22 @@ Options:
 
 ## Decision
 
-Use Sigstore cosign with key-based signing in Project 01. The signing key pair is generated once and stored in Vault. CI uses the same key via a secret injected into the GitHub Actions runner. Signatures are pushed alongside images to GitHub Container Registry.
+Use Sigstore cosign with **keyless signing** driven by GitHub Actions' OIDC identity. The CI workflow requests an OIDC token from GitHub (`id-token: write`), cosign signs the image using that token, and Fulcio issues a short-lived certificate recorded in the Rekor transparency log. Signatures are pushed alongside images to GitHub Container Registry. No long-lived private key is ever generated, stored, or rotated.
 
-A future evolution to keyless cosign (Fulcio + Rekor) in CI is documented as a Project 03 extension.
+For local development, images stay unsigned — local `docker build` output is consumed directly by `k3d image import` without going through a registry. Only CI-produced images land in GHCR, and only those are signed.
 
 ## Consequences
 
 **Upside**
 
-- Signed images are verifiable offline. The CI produces a `cosign verify` step as part of its own pipeline — any tampered image fails verification.
-- Cosign is the supply-chain-signing tool with real adoption.
+- No key to manage, rotate, or leak. The signing identity is the workflow run itself, which has a cryptographically verifiable ancestry (repo + commit + ref + actor).
+- Verification is repo-scoped: `cosign verify --certificate-identity-regexp ".*mdas333/sre-platform.*" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"` checks the image was built by this repo's CI.
+- Rekor transparency log provides a public audit trail without the portfolio needing to run its own.
 
 **Downside**
 
-- Key-based cosign requires key management. The portfolio uses Vault for this, which is consistent with ADR 0006.
-- Keyless cosign is the direction of the ecosystem; moving to it is on the Project 03 roadmap.
+- Local push-to-registry workflows cannot sign (there is no OIDC identity outside CI). The workaround of `k3d image import` for local testing is documented in `scripts/cluster-up.sh`.
+- Keyless verification policies can be verbose; provide a `scripts/verify-image.sh` helper.
 
 ## Related
 
