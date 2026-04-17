@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import base64
 
-import pytest
-
-from receipts.signer import KeyResolver, canonical_json, sign, verify
-
+from receipts.signer import canonical_json, sign, verify
 
 KEY_A = b"\x01" * 32
 KEY_B = b"\x02" * 32

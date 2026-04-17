@@ -38,7 +38,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+# Strip the leading 'src/' so modules import flatly (e.g. `import config`
+# rather than `from src.config import ...`). The Dockerfile sets
+# PYTHONPATH=/app/src to match this convention at runtime.
+sources = ["src"]
+# Every subdirectory under src/ that has __init__.py is a package.
+packages = ["src/k8s", "src/vault", "src/slo", "src/receipts", "src/llm", "src/routes"]
 
 [tool.ruff]
 line-length = 100
@@ -47,7 +52,15 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "B", "UP", "RUF", "SIM", "PL"]
-ignore = ["E501", "PLR0913", "PLR2004"]
+ignore = [
+  "E501",
+  "PLR0913",
+  "PLR2004",
+  "PLW0603",  # intentional module-level singleton pattern
+  "PLC0415",  # lazy imports for optional dependencies
+  "RUF002",   # dash flavour is stylistic
+  "RUF003",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004", "S101"]
