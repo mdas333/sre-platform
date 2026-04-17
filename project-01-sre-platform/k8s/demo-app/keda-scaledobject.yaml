@@ -1,0 +1,43 @@
+# KEDA ScaledObject — demo-app scale-to-zero.
+#
+# The Platform API itself is always-on (see k8s/platform-api/hpa.yaml with
+# minReplicas=2). This ScaledObject carries the scale-to-zero narrative
+# on a *separate* workload.
+#
+# Trigger: cron. The demo-app scales up to 2 replicas for a scheduled
+# window each day and back to 0 the rest of the time. Cron is chosen over
+# the KEDA HTTP add-on because it is foolproof and deterministic — it
+# makes the scaling behaviour visible without depending on live traffic.
+# A production deployment would replace this with HTTP / Prometheus /
+# Kafka / SQS triggers depending on the workload's actual signal source.
+#
+# To trigger scale-up on demand (e.g. during a demo recording), apply the
+# `scripts/demo-keda-trigger.sh` helper which temporarily annotates this
+# object with a near-future cron window.
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: demo-app
+  namespace: sre-platform
+  labels:
+    app.kubernetes.io/name: demo-app
+    app.kubernetes.io/part-of: sre-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: demo-app
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  pollingInterval: 15       # seconds — how often KEDA evaluates triggers
+  cooldownPeriod: 60        # seconds of no-trigger before scaling to minReplicaCount
+  triggers:
+    - type: cron
+      metadata:
+        timezone: UTC
+        # UTC 08:00 – 09:00 daily. Portfolio reviewers anywhere in the
+        # world will see the workload awake during their morning.
+        start:  "0 8 * * *"
+        end:    "0 9 * * *"
+        desiredReplicas: "2"
