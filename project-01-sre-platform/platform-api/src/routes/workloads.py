@@ -125,4 +125,15 @@ def workload_scale(workload_id: str, body: WorkloadScale) -> dict:
         before={"replicas": before_reps} if before_reps is not None else {},
         after={"replicas": body.replicas},
     )
-    return {"workload_id": workload_id, "scaled_to": body.replicas, "receipt": receipt}
+    # P1 scope: the endpoint emits a signed intent receipt but does not yet
+    # patch the Deployment spec. Actual kubectl-equivalent scaling is a
+    # Task #14 deliverable (when the Platform API gets RBAC + write access
+    # to sre-platform namespace). The response shape makes the split
+    # explicit so a caller doesn't assume the scale took effect.
+    return {
+        "workload_id": workload_id,
+        "status": "receipt_issued",
+        "requested_replicas": body.replicas,
+        "receipt": receipt,
+        "note": "Signed intent only in P1. Actual replica patch lands with Task #14.",
+    }

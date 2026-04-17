@@ -31,11 +31,22 @@ def get_slo_store() -> SLOStore:
 
 def _dev_key_provider():
     """Dev fallback: a static key from env, rotated manually."""
+    import base64
+    import binascii
+
     kid = os.environ.get("RECEIPT_KID", "dev-key-0")
     key = os.environ.get("RECEIPT_KEY_B64")
     if key:
-        import base64
-        return kid, base64.b64decode(key)
+        try:
+            return kid, base64.b64decode(key, validate=True)
+        except (binascii.Error, ValueError):
+            logger.warning(
+                "RECEIPT_KEY_B64 is not valid base64; falling back to dev placeholder"
+            )
+    logger.warning(
+        "Using static dev HMAC key — receipts are NOT cryptographically meaningful. "
+        "Set RECEIPT_KEY_B64 or configure Vault for production use."
+    )
     return kid, b"dev-placeholder-key-32bytes-xxxxxxx"[:32]
 
 

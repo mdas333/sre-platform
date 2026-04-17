@@ -41,9 +41,10 @@ def cluster_health() -> dict:
 
     deps = list_deployments("sre-platform")
     if deps:
-        avail = sum(
-            1 for d in deps if d.get("available") and d.get("available") >= d.get("desired", 0)
-        )
+        # Note: do NOT short-circuit on `d.get("available")` being truthy — a
+        # deployment intentionally scaled to zero has available=0, which is
+        # still satisfying its desired replicas=0.
+        avail = sum(1 for d in deps if d.get("available", 0) >= d.get("desired", 0))
         dep_pts = 20 * (avail / len(deps))
     else:
         dep_pts = 20.0

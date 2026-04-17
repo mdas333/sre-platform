@@ -1,0 +1,42 @@
+# ArgoCD Application — syncs the k8s/ tree in this repo to the cluster.
+#
+# Point-in-time source: this exact file must land in the cluster first
+# via `kubectl apply -f k8s/argocd/application.yaml`. After that, ArgoCD
+# watches the repo's `main` branch and reconciles any change.
+#
+# repoURL is the public HTTPS clone URL — ArgoCD does not need SSH for
+# a public repo and no credential needs to be configured.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sre-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/mdas333/sre-platform.git
+    targetRevision: main
+    path: project-01-sre-platform/k8s
+    directory:
+      recurse: true
+      exclude: argocd/application.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sre-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 1m

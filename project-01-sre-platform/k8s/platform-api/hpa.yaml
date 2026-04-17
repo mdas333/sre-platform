@@ -1,0 +1,27 @@
+# HorizontalPodAutoscaler for the Platform API.
+#
+# The API is the cluster's control plane and must not scale to zero —
+# minReplicas: 2 keeps at least one pod available during rollouts and
+# under node drains. Scales up to 5 on CPU pressure. This is deliberate:
+# KEDA's event-driven / scale-to-zero scaling is demonstrated on a
+# separate `demo-app` workload, not on the platform itself.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: platform-api
+  namespace: sre-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: platform-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

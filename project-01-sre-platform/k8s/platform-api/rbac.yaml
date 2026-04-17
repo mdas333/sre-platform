@@ -1,0 +1,60 @@
+# Platform API's Kubernetes RBAC.
+#
+# Minimum surface it needs for P1:
+# - Read pods, events, deployments, services in the sre-platform namespace
+#   (to answer /workloads/{id}/events, /workloads listing, etc.).
+# - Read nodes and namespaces cluster-wide (to answer /cluster/nodes and
+#   /cluster/health).
+#
+# No write verbs in P1 — /workloads POST emits a signed intent receipt but
+# does not yet patch the Deployment. When Task #14+ wires actual scaling,
+# "patch deployments/scale" gets added here and not elsewhere.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: platform-api-read
+  namespace: sre-platform
+rules:
+  - apiGroups: [""]
+    resources: [pods, events, services, configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: platform-api-read
+  namespace: sre-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: platform-api-read
+subjects:
+  - kind: ServiceAccount
+    name: platform-api
+    namespace: sre-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-api-cluster-read
+rules:
+  - apiGroups: [""]
+    resources: [nodes, namespaces]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-api-cluster-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-api-cluster-read
+subjects:
+  - kind: ServiceAccount
+    name: platform-api
+    namespace: sre-platform

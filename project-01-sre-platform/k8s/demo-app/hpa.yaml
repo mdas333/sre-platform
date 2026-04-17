@@ -1,0 +1,26 @@
+# Standard HPA as the fallback / stable scaling path for demo-app.
+#
+# Task #16 replaces this with a KEDA ScaledObject that demonstrates
+# scale-to-zero via the HTTP add-on. Until then, this HPA gives the
+# workload realistic autoscaling so the rest of the demo (platform
+# health score, SLO math, receipts) has a real target to reason about.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: demo-app
+  namespace: sre-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: demo-app
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

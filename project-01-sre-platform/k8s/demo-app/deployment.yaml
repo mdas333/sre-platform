@@ -1,0 +1,61 @@
+# Demo workload — the scale-to-zero showcase.
+#
+# This is an nginx deployment managed *by* the Platform API (via signed
+# receipts and SLO tracking). In Task #16 the KEDA ScaledObject in this
+# directory will drive replicas from 0 to N based on incoming traffic
+# (either via the KEDA HTTP add-on or a Prometheus-backed scaler).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  namespace: sre-platform
+  labels:
+    app.kubernetes.io/name: demo-app
+    app.kubernetes.io/part-of: sre-platform
+    app.kubernetes.io/component: workload
+    platform.sre.mdas333/managed-by: platform-api
+spec:
+  # Default replicas=1 at apply time. KEDA / HPA will reset this at
+  # runtime; platforms that don't want KEDA control can set it to 0 and
+  # let the ScaledObject take over.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-app
+        app.kubernetes.io/part-of: sre-platform
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: [ALL]
