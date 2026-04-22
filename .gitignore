@@ -89,3 +89,4 @@ demo/output/
 # Logs
 logs/
 *.log
+next_prompt.txt
