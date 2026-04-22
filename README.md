@@ -132,10 +132,12 @@ Verify any image this repo has published:
 
 ```bash
 cosign verify \
-  --certificate-identity-regexp '.*mdas333/sre-platform.*' \
+  --certificate-identity-regexp '^https://github\.com/mdas333/sre-platform/\.github/workflows/ci\.yml@refs/heads/.*' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
   ghcr.io/mdas333/sre-platform/platform-api:main
 ```
+
+The regex pins verification to *this* repo's `ci.yml` workflow on any branch — any signature produced by a different workflow fails.
 
 ---
 
@@ -172,13 +174,20 @@ Together, the three answer *who wrote this, who built what is running, and who p
 
 ## Quick start (Project 01)
 
-Prerequisites: Docker Desktop running, Homebrew available. Tested on Docker Desktop with **8 GB memory and 14 CPUs**; measured peak memory across the full six-namespace stack is ≈ 4.5 GB. Bring-up completes in about **8 minutes**.
+**Prerequisites:** Docker Desktop running; macOS or Linux; Homebrew (for installing CLI tools). Tested on Docker Desktop with **8 GB memory and 14 CPUs**; measured peak memory across the full six-namespace stack is ≈ 4.5 GB. Bring-up completes in about **8 minutes**.
 
 ```bash
-./shared/scripts/preflight.sh           # verify local tooling
+# One-time: install the CLIs this project expects.
+brew install k3d helm kubectl opentofu hashicorp/tap/vault cosign hey asciinema agg
+
+# Verify the environment.
+./shared/scripts/preflight.sh
+
+# Bring everything up.
 cd project-01-sre-platform
-./scripts/cluster-up.sh                 # full stack in ~8 min
-# curl the Platform API:
+./scripts/cluster-up.sh                                  # ≈8 min
+
+# Reach the Platform API (port-forward in one terminal, curl in another).
 kubectl -n sre-platform port-forward svc/platform-api 8080:80 &
 curl http://localhost:8080/cluster/health | jq
 ```

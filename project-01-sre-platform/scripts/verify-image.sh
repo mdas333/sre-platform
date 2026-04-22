@@ -16,6 +16,6 @@ if ! command -v cosign >/dev/null 2>&1; then
 fi
 
 cosign verify \
-  --certificate-identity-regexp '.*mdas333/sre-platform.*' \
+  --certificate-identity-regexp '^https://github\.com/mdas333/sre-platform/\.github/workflows/ci\.yml@refs/heads/.*' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
   "$IMAGE"

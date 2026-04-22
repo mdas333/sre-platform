@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Verify an HMAC-signed receipt emitted by the Platform API.
+
+Reads a JSON receipt on stdin, fetches the signing key from Vault (or from
+a file given via --key-file, or raw-base64 via --key-b64), and prints either
+VERIFIED or INVALID plus a short explanation.
+
+Exits 0 on VERIFIED, 1 on INVALID, 2 on a configuration/IO error.
+
+Examples
+--------
+    # Verify a receipt just emitted by the API
+    curl -s http://localhost:8080/audit?limit=1 \\
+      | python -c 'import sys,json; print(json.dumps(json.load(sys.stdin)["receipts"][0]))' \\
+      | scripts/verify-receipt
+
+    # Verify offline from a previously-saved receipt and a known key
+    scripts/verify-receipt --key-b64 "$(vault kv get -field=key secret/platform-api/receipt-key)" \\
+      < receipt.json
+
+The verifier does NOT talk to the Platform API — it independently re-signs
+the canonical-JSON payload with the key and compares. The receipt's `kid`
+is used to select the key when --key-file points at a directory of keys.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import hmac
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def canonical_json(payload: dict) -> bytes:
+    """Deterministic JSON: sorted keys, compact separators, UTF-8."""
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
+def resolve_key(kid: str, key_file: str | None, key_b64: str | None) -> bytes:
+    """Return the raw key bytes, by priority: --key-b64, --key-file, env, Vault."""
+    if key_b64:
+        return base64.b64decode(key_b64, validate=True)
+    if key_file:
+        p = Path(key_file)
+        if p.is_dir():
+            p = p / f"{kid}.key"
+        if not p.exists():
+            raise SystemExit(f"key file not found: {p}")
+        return base64.b64decode(p.read_text().strip(), validate=True)
+    env_key = os.environ.get("RECEIPT_KEY_B64")
+    if env_key:
+        return base64.b64decode(env_key, validate=True)
+
+    # Fall through to Vault if credentials are present.
+    vault_addr = os.environ.get("VAULT_ADDR")
+    vault_token = os.environ.get("VAULT_TOKEN")
+    if vault_addr and vault_token:
+        try:
+            import hvac  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise SystemExit("hvac not installed; pip install hvac") from exc
+        client = hvac.Client(url=vault_addr, token=vault_token)
+        resp = client.secrets.kv.v2.read_secret_version(path="platform-api/receipt-key")
+        return base64.b64decode(resp["data"]["data"]["key"], validate=True)
+
+    raise SystemExit(
+        "no key source available. Provide --key-b64, --key-file, RECEIPT_KEY_B64 env, "
+        "or set VAULT_ADDR + VAULT_TOKEN to read from Vault."
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--key-b64", help="HMAC key, raw base64-encoded")
+    parser.add_argument("--key-file", help="Path to a key file (or dir of <kid>.key)")
+    args = parser.parse_args()
+
+    try:
+        receipt = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        print(f"INVALID — stdin is not valid JSON: {exc}", file=sys.stderr)
+        return 2
+
+    if not isinstance(receipt, dict):
+        print("INVALID — receipt must be a JSON object", file=sys.stderr)
+        return 1
+
+    received_hmac = receipt.get("hmac")
+    kid = receipt.get("kid")
+    if not isinstance(received_hmac, str) or not isinstance(kid, str):
+        print("INVALID — receipt missing 'hmac' or 'kid' string field", file=sys.stderr)
+        return 1
+
+    try:
+        provided = base64.b64decode(received_hmac, validate=True)
+        key = resolve_key(kid, args.key_file, args.key_b64)
+    except ValueError as exc:
+        print(f"INVALID — {exc}", file=sys.stderr)
+        return 1
+
+    payload_without_hmac = {k: v for k, v in receipt.items() if k != "hmac"}
+    expected = hmac.new(key, canonical_json(payload_without_hmac), hashlib.sha256).digest()
+
+    if hmac.compare_digest(provided, expected):
+        print(f"VERIFIED  kid={kid}  op_id={receipt.get('op_id', '<none>')}")
+        return 0
+    print(
+        "INVALID — signature mismatch. "
+        "Either the receipt has been tampered with, or the key does not match the 'kid'.",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

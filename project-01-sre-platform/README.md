@@ -206,7 +206,7 @@ Verify any published image locally:
 scripts/verify-image.sh ghcr.io/mdas333/sre-platform/platform-api:main
 # Runs:
 # cosign verify \
-#   --certificate-identity-regexp '.*mdas333/sre-platform.*' \
+#   --certificate-identity-regexp '^https://github\.com/mdas333/sre-platform/\.github/workflows/ci\.yml@refs/heads/.*' \
 #   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
 #   ghcr.io/mdas333/sre-platform/platform-api:main
 ```

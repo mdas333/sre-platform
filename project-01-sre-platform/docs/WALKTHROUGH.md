@@ -240,14 +240,12 @@ flowchart LR
   subgraph CL["Cluster level — node add/drain/remove"]
     NA["scripts/scale-cluster-up.sh<br/>→ k3d node create"]
     ND["scripts/scale-cluster-down.sh<br/>→ kubectl drain + k3d node delete"]
+    NA --> ND
   end
   subgraph WL["Workload level — replica count"]
-    HPA["Platform API (always-on)<br/>HPA minReplicas=2 · maxReplicas=5<br/>scales on CPU"]
-    KDO["demo-app (scale-to-zero tenant)<br/>KEDA ScaledObject<br/>minReplicaCount=0 · maxReplicaCount=3<br/>cron trigger"]
+    HPA["Platform API (always-on)<br/>HPA minReplicas=2 · maxReplicas=5<br/>declarative ceiling; in P1, metrics-server<br/>is disabled to save RAM, so the HPA acts as<br/>a floor not an elastic scaler"]
+    KDO["demo-app (scale-to-zero tenant)<br/>KEDA ScaledObject<br/>minReplicaCount=0 · maxReplicaCount=3<br/>cron trigger — fires every morning UTC;<br/>production swaps for HTTP/Prom/Kafka trigger"]
   end
-  NA --> ND
-  HPA -. never to zero .-> HPA
-  KDO --> KDO
 ```
 
 ### Cluster-level
@@ -347,7 +345,7 @@ The flow:
 
 ```bash
 cosign verify \
-  --certificate-identity-regexp '.*mdas333/sre-platform.*' \
+  --certificate-identity-regexp '^https://github\.com/mdas333/sre-platform/\.github/workflows/ci\.yml@refs/heads/.*' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
   ghcr.io/mdas333/sre-platform/platform-api:main
 ```
@@ -482,7 +480,7 @@ The `kid` field is `key-2026-04-18` — the date-stamped key seeded by `infrastr
 
 ```text
 $ cosign verify \
-    --certificate-identity-regexp '.*mdas333/sre-platform.*' \
+    --certificate-identity-regexp '^https://github\.com/mdas333/sre-platform/\.github/workflows/ci\.yml@refs/heads/.*' \
     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
     ghcr.io/mdas333/sre-platform/platform-api:main
 
@@ -553,6 +551,9 @@ resources reconciled:
 Twelve resources, reconciled from the commit on `main`. Any `kubectl edit` against them drifts back.
 
 ### SigNoz ingestion  *(screenshot slot: SigNoz UI)*
+
+To view the SigNoz UI locally: `kubectl -n signoz port-forward svc/signoz 3301:8080` and open http://localhost:3301 in a browser.
+
 
 <!-- PROOF-IMAGE-3: SigNoz UI at http://localhost:3301 showing the Services view or a traces list with the platform-api service visible. Drop file as docs/proof-images/signoz-ui.png then replace this HTML comment. -->
 
