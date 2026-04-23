@@ -505,7 +505,7 @@ Any image whose signature does not chain back to a workflow run in this repo on 
 
 ### Docker Desktop — containers running  *(screenshot slot: Docker Desktop)*
 
-<!-- PROOF-IMAGE-1: Docker Desktop Containers tab showing k3d-sre-platform-* entries. Drop file as docs/proof-images/docker-desktop.png then replace this HTML comment with ![Docker Desktop](./proof-images/docker-desktop.png) -->
+![Docker Desktop showing the k3d-sre-platform containers](./proof-images/docker-desktop.png)
 
 **Text fallback** (`docker ps` showing the k3d containers that make up the cluster):
 
@@ -524,7 +524,7 @@ One server, three agents, a proxy, and a helper tools container — exactly what
 
 ### ArgoCD Application state  *(screenshot slot: ArgoCD UI)*
 
-<!-- PROOF-IMAGE-2: ArgoCD UI at http://localhost:8080 showing the sre-platform Application card with Synced/Healthy status and the 12 reconciled resources. Drop file as docs/proof-images/argocd-ui.png then replace this HTML comment. -->
+![ArgoCD sre-platform Application — Synced / Healthy](./proof-images/argocd-ui.png)
 
 **Text fallback** (`kubectl get application -n argocd sre-platform` summary):
 
@@ -555,7 +555,11 @@ Twelve resources, reconciled from the commit on `main`. Any `kubectl edit` again
 To view the SigNoz UI locally: `kubectl -n signoz port-forward svc/signoz 3301:8080` and open http://localhost:3301 in a browser.
 
 
-<!-- PROOF-IMAGE-3: SigNoz UI at http://localhost:3301 showing the Services view or a traces list with the platform-api service visible. Drop file as docs/proof-images/signoz-ui.png then replace this HTML comment. -->
+![SigNoz home — onboarding complete, platform-api service ingesting traces](./proof-images/signoz-ui.png)
+
+Traces flowing from the Platform API through the OTel Collector into SigNoz's ClickHouse-backed store:
+
+![SigNoz Traces Explorer — live spans from platform-api (GET /readyz, durations in ms)](./proof-images/signoz-traces.png)
 
 **Text fallback** (SigNoz pods running and OTLP ingestion endpoint reachable):
 
@@ -574,7 +578,7 @@ ClickHouse, the SigNoz binary, the operator, the OTel ingestion collector, and Z
 
 ### GitHub Actions — green CI  *(screenshot slot: GHA UI)*
 
-<!-- PROOF-IMAGE-4: GitHub Actions page for mdas333/sre-platform showing the most recent ci workflow run with three green-checkmark jobs (Platform API, manifests, build+sign). Drop file as docs/proof-images/gha.png then replace this HTML comment. -->
+![GitHub Actions — seven consecutive green CI runs on main](./proof-images/gha.png)
 
 **Text fallback** (most recent four workflow runs, queried via GitHub's public REST API):
 

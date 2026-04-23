@@ -90,3 +90,4 @@ demo/output/
 logs/
 *.log
 next_prompt.txt
+.playwright-mcp/
