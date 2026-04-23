@@ -40,7 +40,7 @@ flowchart TB
     U[curl · scripts · your code]
   end
   subgraph Platform["Platform surface"]
-    PA["Platform API (FastAPI)<br/>17 routes · SLO math · HMAC receipts<br/>POST /workloads · GET /audit · GET /cluster/health · /metrics"]
+    PA["Platform API (FastAPI)<br/>13 endpoints · SLO math · HMAC receipts<br/>POST /workloads · GET /audit · GET /cluster/health · /metrics"]
   end
   subgraph Deps["Platform dependencies (Helm-installed)"]
     direction LR
@@ -214,7 +214,7 @@ Together, the three answer *who wrote this, who built what is running, and who p
 
 ```bash
 # One-time: install the CLIs this project expects.
-brew install k3d helm kubectl opentofu hashicorp/tap/vault cosign hey asciinema agg
+brew install k3d helm kubectl opentofu hashicorp/tap/vault cosign jq hey asciinema agg
 
 # Verify the environment.
 ./shared/scripts/preflight.sh

@@ -130,7 +130,7 @@ There are 12 tools. Each card below tells you **what it is** in one sentence, **
 ### FastAPI
 
 - **What:** a modern Python framework for building HTTP APIs.
-- **Here:** the Platform API itself — 17 routes serving the developer-facing platform surface. See [ADR 0007](../../shared/adr/0007-fastapi-with-official-k8s-client.md).
+- **Here:** the Platform API itself — 13 endpoints serving the developer-facing platform surface. See [ADR 0007](../../shared/adr/0007-fastapi-with-official-k8s-client.md).
 - **Why:** async-native, auto-generated OpenAPI docs, typed request/response via Pydantic.
 - **Analogy:** a strongly-typed contract between clients and your service.
 
@@ -153,7 +153,7 @@ flowchart TB
     U["curl / Postman / scripts"]
   end
   subgraph L3["Platform surface"]
-    PA["Platform API (FastAPI)<br/>17 routes<br/>POST /workloads · GET /cluster/health ·<br/>GET /audit · GET /workloads/:id/slo · /metrics"]
+    PA["Platform API (FastAPI)<br/>13 endpoints<br/>POST /workloads · GET /cluster/health ·<br/>GET /audit · GET /workloads/:id/slo · /metrics"]
   end
   subgraph L2["Platform dependencies (installed by Helm into the cluster)"]
     direction LR
@@ -183,7 +183,7 @@ flowchart TB
 
 1. **Infrastructure** — bring the cluster into existence and keep it there. OpenTofu drives lifecycle; Docker + k3d do the actual work; four Linux "nodes" exist as Docker containers.
 2. **Platform dependencies** — the shared services every workload on the cluster benefits from. Vault issues credentials; ArgoCD reconciles state from Git; KEDA scales pods; OTel + SigNoz collect and store telemetry.
-3. **Platform surface** — the product the platform offers to developers. In this project that's a single FastAPI service exposing 17 routes. It talks to Kubernetes and Vault so the caller doesn't have to.
+3. **Platform surface** — the product the platform offers to developers. In this project that's a single FastAPI service exposing thirteen developer-facing endpoints. It talks to Kubernetes and Vault so the caller doesn't have to.
 4. **Clients** — anyone consuming the platform. For the demo, that's `curl` and a few helper scripts. In a real organisation, it'd be each internal team's deployment tooling.
 
 The boundary between layers is strict: nothing in Layer 3 (the Platform API) cares which tool in Layer 2 is installed, as long as Vault, Kubernetes, and OTLP endpoints exist. Swap Vault for a different secret store, and only Layer 2 changes.

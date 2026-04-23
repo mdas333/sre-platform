@@ -8,6 +8,8 @@
 
 **An internal developer platform on Kubernetes with SRE-grade reliability engineering built in — not bolted on.**
 
+13 HTTP endpoints, 31 unit tests, three independent cryptographic signatures (commits · images · operation receipts).
+
 ![KEDA scales a tenant workload 0 → 2 in about 18 seconds; the Platform API itself stays always-on at 2 replicas](./docs/demos/keda-scale.gif)
 
 > 📖 **Heads up:** the long form of everything in this README — architecture, per-tool rationale, a walkthrough of a single workload creation, SLO math worked example, and the full "proof it works" chapter — is in **[`docs/WALKTHROUGH.md`](./docs/WALKTHROUGH.md)**. This README is the scannable summary.
@@ -38,7 +40,7 @@ flowchart TB
     U[curl · scripts · your code]
   end
   subgraph Platform["Platform surface"]
-    PA["Platform API (FastAPI)<br/>17 routes · SLO math · HMAC receipts<br/>POST /workloads · GET /audit · GET /cluster/health · /metrics"]
+    PA["Platform API (FastAPI)<br/>13 endpoints · SLO math · HMAC receipts<br/>POST /workloads · GET /audit · GET /cluster/health · /metrics"]
   end
   subgraph Deps["Platform dependencies (Helm-installed)"]
     direction LR
@@ -75,7 +77,7 @@ Prerequisites: Docker Desktop running, Homebrew available.
 
 ```bash
 # First time only — install the CLIs this project uses.
-brew install k3d helm kubectl opentofu hashicorp/tap/vault cosign hey asciinema agg
+brew install k3d helm kubectl opentofu hashicorp/tap/vault cosign jq hey asciinema agg
 
 # Verify, then bring the stack up.
 ../shared/scripts/preflight.sh     # all [ok]
@@ -100,7 +102,6 @@ Teardown: `./scripts/cluster-down.sh`.
 | GET | `/workloads/{id}/health` | Error-budget-aware state (`healthy` / `burning` / `breached`) |
 | GET | `/workloads/{id}/slo` | SLO target, error budget, burn rate |
 | POST | `/workloads/{id}/scale` | Scale replicas; emits a signed receipt |
-| GET | `/workloads/{id}/events` | Recent warning events for the workload |
 | GET | `/workloads/{id}/explain` | LLM-generated plain-English status (feature-gated) |
 | GET | `/cluster/health` | Aggregate 0–100 cluster health score |
 | GET | `/cluster/nodes` | Node status, capacity, conditions |
@@ -243,7 +244,7 @@ ArgoCD picks up the new image on the next reconcile and rolls out the Deployment
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-4-node k3d cluster provisioned via OpenTofu · Vault / ArgoCD / SigNoz / KEDA / OTel Collector Helm-installed and bootstrapped · 17 FastAPI routes with 31 unit tests passing · image signed keyless via GitHub OIDC · `sre-platform` Application Synced / Healthy · cluster-level and KEDA scale-to-zero demos recorded under `docs/demos/`.
+4-node k3d cluster provisioned via OpenTofu · Vault / ArgoCD / SigNoz / KEDA / OTel Collector Helm-installed and bootstrapped · 13 FastAPI endpoints with 31 unit tests passing · image signed keyless via GitHub OIDC · `sre-platform` Application Synced / Healthy · cluster-level and KEDA scale-to-zero demos recorded under `docs/demos/`.
 
 ---
 
